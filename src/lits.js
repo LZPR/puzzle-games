@@ -1,5 +1,5 @@
 import { GridGame, MARK_NAMES, MARKS } from "./grid-game.js";
-import { checkLits, litsNeighbors } from "./lits-rules.js";
+import { checkLits, litsNeighbors, litsShape } from "./lits-rules.js";
 
 const SAVE_KEY = "lits-progress-v1";
 const DEFAULT_SIZE = 6;
@@ -94,6 +94,7 @@ class LitsGame extends GridGame {
     const { size, regions } = puzzle;
     this.puzzle = puzzle;
     this.puzzleIndex = index;
+    this.neighbors = litsNeighbors(size);
     this.regionNumbers = new Map();
     for (const region of regions) {
       if (!this.regionNumbers.has(region)) this.regionNumbers.set(region, this.regionNumbers.size + 1);
@@ -186,15 +187,27 @@ class LitsGame extends GridGame {
 
   paint() {
     const { size, regions } = this.puzzle;
+    const filledByRegion = new Map();
+    for (const [index, mark] of this.board.entries()) {
+      if (mark !== 1) continue;
+      const region = regions[index];
+      if (!filledByRegion.has(region)) filledByRegion.set(region, []);
+      filledByRegion.get(region).push(index);
+    }
+    const shapes = new Map([...filledByRegion].map(([region, filled]) =>
+      [region, litsShape(filled, size, this.neighbors)]));
     this.cells.forEach((cell, index) => {
       const row = Math.floor(index / size) + 1;
       const column = index % size + 1;
       const region = this.regionNumbers.get(regions[index]);
       const mark = this.board[index];
+      const shape = mark === 1 ? shapes.get(regions[index]) : null;
       cell.dataset.mark = mark;
+      if (shape) cell.dataset.shape = shape;
+      else delete cell.dataset.shape;
       const mistake = this.mistakes.has(index);
       cell.classList.toggle("lits-error", mistake);
-      const feedback = mistake ? "，所在区域填充过多" : "";
+      const feedback = mistake ? "，所在区域填充过多" : shape ? `，${shape} 形四连块` : "";
       cell.setAttribute("aria-label", `第 ${row} 行，第 ${column} 列，区域 ${region}，${MARK_NAMES[mark]}${feedback}`);
     });
     this.toggleAttribute("data-won", this.won);

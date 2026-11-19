@@ -1,8 +1,16 @@
+:root {
+  --lits-fill-neutral: #c4becd;
+  --lits-fill-l: #ffae87;
+  --lits-fill-i: #83cef4;
+  --lits-fill-t: #c6a5f3;
+  --lits-fill-s: #9cdb9f;
+}
+
 lits-game {
   --lits-ink: #2d2143;
   --lits-background: #fffdf3;
   --lits-gridline: #d5cab6;
-  --lits-fill: #8060c0;
+  --lits-fill: var(--lits-fill-neutral);
   --lits-error: #ae4037;
   display: grid;
   grid-template: minmax(0, 1fr) / minmax(0, 1fr);
@@ -71,7 +79,23 @@ lits-game {
 }
 
 .lits-cell[data-mark="1"]::before {
-  --lits-gridline: #a88ad9;
+  --lits-gridline: rgb(45 33 67 / 28%);
+}
+
+.lits-cell[data-shape="L"] {
+  --lits-fill: var(--lits-fill-l);
+}
+
+.lits-cell[data-shape="I"] {
+  --lits-fill: var(--lits-fill-i);
+}
+
+.lits-cell[data-shape="T"] {
+  --lits-fill: var(--lits-fill-t);
+}
+
+.lits-cell[data-shape="S"] {
+  --lits-fill: var(--lits-fill-s);
 }
 
 .lits-cell[data-mark="2"]::after {
@@ -92,10 +116,6 @@ lits-game {
 
 @media (hover: hover) {
   lits-game:not([data-won], [aria-busy="true"]) .lits-cell:hover {
-    box-shadow: inset 0 0 0 2px var(--lits-fill);
-  }
-
-  lits-game:not([data-won], [aria-busy="true"]) .lits-cell[data-mark="1"]:hover {
     box-shadow: inset 0 0 0 2px var(--lits-ink);
   }
 }
