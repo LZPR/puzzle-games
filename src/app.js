@@ -51,11 +51,12 @@ const games = new Map([
       '点击或拖动绘制，右键标叉。用 Tab 进入棋盘，按方向键移动、空格使用当前工具。',
     ],
     shapes: [
-      ['L', ['L.', 'L.', 'LL']],
-      ['I', ['MMMM']],
-      ['T', ['YYY', '.Y.']],
+      ['L', ['X.', 'X.', 'XX']],
+      ['I', ['XXXX']],
+      ['T', ['XXX', '.X.']],
       ['S', ['.XX', 'XX.']],
     ],
+    shapeHelp: '区域内的填色格拼成四格形状时，会显示对应颜色。其余填色格显示为灰色。',
   }],
 ]);
 
@@ -127,15 +128,15 @@ class PuzzleArcade extends HTMLElement {
           </nav>
         </div>
       </header>
-      ${game ? this.gameMarkup(game) : this.lobbyMarkup()}
+      ${game ? this.gameMarkup(game, route) : this.lobbyMarkup()}
       <footer class="site-footer"><span>方块街机</span><i aria-hidden="true"></i><span>PUZZLE ARCADE</span></footer>
     `;
     this.board = game ? this.querySelector(game.element) : null;
   }
 
-  gameMarkup(game) {
+  gameMarkup(game, route) {
     return `
-      <main class="shell">
+      <main class="shell" data-game="${route}">
         <div class="game-intro">
           <div class="game-identity">
             <div class="sprite-frame">${sprite(game.sprite, 'game-pixels')}</div>
@@ -208,8 +209,9 @@ class PuzzleArcade extends HTMLElement {
       <dialog class="panel" aria-labelledby="help-title">
         <h2 id="help-title">游戏玩法</h2>
         <ol>${game.help.map(step => `<li>${step}</li>`).join('')}</ol>
-        ${game.shapes ? `<ul class="shape-guide" aria-label="四格形状">
-          ${game.shapes.map(([label, pixels]) => `<li>${sprite(pixels, 'shape-pixels')}<strong>${label}</strong></li>`).join('')}
+        ${game.shapes ? `<p class="shape-help">${game.shapeHelp}</p>
+        <ul class="shape-guide" aria-label="四格形状">
+          ${game.shapes.map(([label, pixels]) => `<li data-shape="${label}">${sprite(pixels, 'shape-pixels')}<strong>${label}</strong></li>`).join('')}
         </ul>` : ''}
         <form method="dialog"><button class="button lavender">开始游戏</button></form>
       </dialog>

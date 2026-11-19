@@ -97,6 +97,7 @@ h1, h2, p { margin: 0; }
 .board-footer span { display: inline-flex; gap: 7px; align-items: center; }
 .board-footer i { width: 13px; height: 13px; border: 1px solid var(--ink); border-radius: 2px; font-style: normal; }
 .legend-square { background: #8060c0; }
+[data-game="lits"] .legend-square { background: var(--lits-fill-neutral); }
 .legend-cross { display: grid; align-content: center; justify-content: center; background: var(--peach); font-weight: 900; }
 .legend-empty { background: var(--white); }
 
@@ -151,11 +152,15 @@ dialog { padding: 23px; max-width: min(440px, calc(100vw - 36px)); color: var(--
 dialog::backdrop { background: #29263880; }
 dialog ol { padding-inline-start: 25px; line-height: 1.7; }
 dialog ol li + li { margin-top: .55em; }
+.shape-help { font-size: 13px; line-height: 1.6; color: var(--muted); }
 .shape-guide { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; padding: 0; list-style: none; }
 .shape-guide li { display: grid; grid-template-rows: 34px auto; place-items: center; gap: 6px; padding: 6px 3px; border: 1px solid #bcb3c7; border-radius: 6px; font: 700 13px Consolas, "Courier New", monospace; }
+.shape-guide [data-shape="L"] { --shape-color: var(--lits-fill-l); }
+.shape-guide [data-shape="I"] { --shape-color: var(--lits-fill-i); }
+.shape-guide [data-shape="T"] { --shape-color: var(--lits-fill-t); }
+.shape-guide [data-shape="S"] { --shape-color: var(--lits-fill-s); }
 .shape-pixels { display: grid; grid-template-columns: repeat(var(--pixels), 10px); grid-auto-rows: 10px; gap: 1px; }
-.shape-pixels i:not([data-pixel="."]) { border: 1px solid var(--ink); border-radius: 1px; }
-.shape-pixels [data-pixel="X"] { background: var(--lavender); }
+.shape-pixels [data-pixel="X"] { background: var(--shape-color); border: 1px solid var(--ink); border-radius: 1px; }
 dialog form { display: flex; justify-content: end; }
 .lobby { min-height: 400px; }
 .lobby-frame { background: var(--yellow); }
