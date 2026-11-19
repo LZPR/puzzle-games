@@ -1,0 +1,171 @@
+nonogram-game {
+  --ng-ink: #2d2143;
+  --ng-background: #fffdf3;
+  --ng-clues: #f7eedb;
+  --ng-divider: #d5cab6;
+  --ng-fill: #8060c0;
+  --ng-error: #ae4037;
+  display: grid;
+  grid-template-columns: minmax(0, var(--row-header, 3fr)) minmax(0, var(--board-track, 10fr));
+  grid-template-rows: minmax(0, var(--column-header, 3fr)) minmax(0, var(--board-track, 10fr));
+  width: 100%;
+  aspect-ratio: 1;
+  max-width: 660px;
+  box-sizing: border-box;
+  border: 2px solid var(--ng-ink);
+  background: var(--ng-background);
+  color: var(--ng-ink);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+nonogram-game > * {
+  min-width: 0;
+  min-height: 0;
+}
+
+.ng-corner,
+.ng-columns,
+.ng-rows {
+  background: var(--ng-clues);
+}
+
+.ng-corner {
+  display: grid;
+  place-items: center;
+  border-right: 2px solid var(--ng-ink);
+  border-bottom: 2px solid var(--ng-ink);
+}
+
+.ng-motif {
+  display: grid;
+  grid-template-columns: repeat(3, clamp(4px, 1vw, 8px));
+  grid-auto-rows: clamp(4px, 1vw, 8px);
+  gap: 2px;
+  transform: rotate(-6deg);
+}
+
+.ng-pixel--1 {
+  background: var(--ng-fill);
+}
+
+.ng-pixel--0 {
+  background: #e1d2ec;
+}
+
+.ng-columns {
+  display: grid;
+  grid-template-columns: repeat(var(--size), minmax(0, 1fr));
+  border-bottom: 2px solid var(--ng-ink);
+}
+
+.ng-rows {
+  display: grid;
+  grid-template-rows: repeat(var(--size), minmax(0, 1fr));
+  border-right: 2px solid var(--ng-ink);
+}
+
+.ng-clue {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  font: 700 clamp(9px, 1.7vw, 17px) / 1.05 var(--font-mono, ui-monospace, monospace);
+  font-variant-numeric: tabular-nums;
+  gap: clamp(3px, 0.65vw, 7px);
+}
+
+.ng-clue--column {
+  flex-direction: column;
+  padding-bottom: clamp(3px, 0.7vw, 8px);
+}
+
+.ng-clue--row {
+  padding-right: clamp(4px, 0.85vw, 10px);
+}
+
+.ng-cells {
+  display: grid;
+  grid-template-rows: repeat(var(--size), minmax(0, 1fr));
+  touch-action: none;
+}
+
+.ng-cell-row {
+  display: grid;
+  grid-template-columns: repeat(var(--size), minmax(0, 1fr));
+}
+
+.ng-cell,
+.ng-clue--column {
+  border-right: 1px solid var(--ng-divider);
+}
+
+.ng-cell,
+.ng-clue--row {
+  border-bottom: 1px solid var(--ng-divider);
+}
+
+.ng-cell:nth-child(5n),
+.ng-clue--column:nth-child(5n) {
+  border-right: 2px solid var(--ng-ink);
+}
+
+.ng-cell-row:nth-child(5n) .ng-cell,
+.ng-clue--row:nth-child(5n) {
+  border-bottom: 2px solid var(--ng-ink);
+}
+
+.ng-cell:last-child,
+.ng-clue--column:last-child {
+  border-right: 0;
+}
+
+.ng-cell-row:last-child .ng-cell,
+.ng-clue--row:last-child {
+  border-bottom: 0;
+}
+
+.ng-cell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.ng-cell[data-mark="1"] {
+  background: var(--ng-fill);
+}
+
+.ng-cell[data-mark="2"]::after {
+  content: "";
+  width: 45%;
+  aspect-ratio: 1;
+  background:
+    linear-gradient(45deg, transparent 45%, currentColor 46% 54%, transparent 55%),
+    linear-gradient(-45deg, transparent 45%, currentColor 46% 54%, transparent 55%);
+  opacity: 0.65;
+}
+
+.ng-cell.ng-error {
+  box-shadow: inset 0 0 0 2px var(--ng-error);
+  color: var(--ng-error);
+}
+
+.ng-cell:focus-visible {
+  z-index: 1;
+  outline: 2px solid var(--ng-ink);
+  outline-offset: -3px;
+}
+
+@media (hover: hover) {
+  nonogram-game:not([data-won]) .ng-cell:hover {
+    box-shadow: inset 0 0 0 2px var(--ng-fill);
+  }
+
+  nonogram-game:not([data-won]) .ng-cell[data-mark="1"]:hover {
+    box-shadow: inset 0 0 0 2px var(--ng-ink);
+  }
+}
+
+nonogram-game[data-won] .ng-cell {
+  cursor: default;
+}
