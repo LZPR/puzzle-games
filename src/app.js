@@ -1,10 +1,14 @@
 import './nonogram.js';
+import './lits.js';
 
 const games = new Map([
   ['nonogram', {
     title: '数织',
     english: 'NONOGRAM',
     element: 'nonogram-game',
+    sizes: [5, 10, 15],
+    difficulties: { easy: '简单', medium: '中等', hard: '困难' },
+    defaultSize: 10,
     description: '用行列提示找出藏在棋盘里的像素图案。',
     sprite: [
       '..X....X..',
@@ -22,9 +26,38 @@ const games = new Map([
       '点击或拖动即可操作方格，也可以右键标叉。检查答案会告诉你是否已经解开谜题。',
     ],
   }],
+  ['lits', {
+    title: '四格拼图',
+    english: 'LITS',
+    lobbyTitle: 'LITS 四格拼图',
+    element: 'lits-game',
+    sizes: [6, 8],
+    difficulties: { normal: '普通', hard: '困难' },
+    defaultSize: 6,
+    description: '在每个区域拼出四格形状，把所有填色格连在一起。',
+    sprite: [
+      '.LL.....',
+      '.L..YYY.',
+      '.L...Y..',
+      '........',
+      '.MMMM...',
+      '.....XX.',
+      '....XX..',
+    ],
+    help: [
+      '每个粗线围成的区域恰好填四格，四格须共边相连，组成 L、I、T、S 之一。可以旋转或翻转。',
+      '所有填色格必须共边连成一片，且任何 2 × 2 方块都不能填满。',
+      '不同区域中，同一种形状的填色格不能共边。旋转或翻转后仍算同一种形状。',
+      '点击或拖动绘制，右键标叉。用 Tab 进入棋盘，按方向键移动、空格使用当前工具。',
+    ],
+    shapes: [
+      ['L', ['L.', 'L.', 'LL']],
+      ['I', ['MMMM']],
+      ['T', ['YYY', '.Y.']],
+      ['S', ['.XX', 'XX.']],
+    ],
+  }],
 ]);
-
-const difficultyNames = { easy: '简单', medium: '中等', hard: '困难' };
 
 const icons = {
   grid: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>',
@@ -80,7 +113,9 @@ class PuzzleArcade extends HTMLElement {
 
   render(route) {
     const game = games.get(route);
+    this.activeGame = game;
     this.activeSettings = null;
+    this.previousMoves = undefined;
     document.title = game ? `${game.title} · 方块街机` : '游戏大厅 · 方块街机';
     this.innerHTML = `
       <header class="site-header">
@@ -95,7 +130,7 @@ class PuzzleArcade extends HTMLElement {
       ${game ? this.gameMarkup(game) : this.lobbyMarkup()}
       <footer class="site-footer"><span>方块街机</span><i aria-hidden="true"></i><span>PUZZLE ARCADE</span></footer>
     `;
-    this.board = this.querySelector(game?.element ?? 'nonogram-game');
+    this.board = game ? this.querySelector(game.element) : null;
   }
 
   gameMarkup(game) {
@@ -109,9 +144,9 @@ class PuzzleArcade extends HTMLElement {
           <button class="button help-button" type="button" data-action="help">${icon('help', 17)}<span>游戏玩法</span></button>
         </div>
         <div class="game-layout">
-          <section class="panel game-panel" aria-label="数织棋盘">
+          <section class="panel game-panel" aria-labelledby="board-title">
             <div class="game-panel-header">
-              <div class="panel-title"><span class="panel-lights" aria-hidden="true"><i></i><i></i><i></i></span><h2>数织棋盘</h2></div>
+              <div class="panel-title"><span class="panel-lights" aria-hidden="true"><i></i><i></i><i></i></span><h2 id="board-title">${game.title}棋盘</h2></div>
               <span class="puzzle-label" data-status="puzzle">自由挑战</span>
             </div>
             <div class="board-body"><${game.element}></${game.element}></div>
@@ -156,14 +191,12 @@ class PuzzleArcade extends HTMLElement {
               <div class="settings-row">
                 <label>棋盘尺寸
                   <select data-setting="size">
-                    <option value="5">5 × 5</option>
-                    <option value="10" selected>10 × 10</option>
-                    <option value="15">15 × 15</option>
+                    ${game.sizes.map(size => `<option value="${size}"${size === game.defaultSize ? ' selected' : ''}>${size} × ${size}</option>`).join('')}
                   </select>
                 </label>
                 <label>难度
                   <select data-setting="difficulty">
-                    ${Object.entries(difficultyNames).map(([value, label]) => `<option value="${value}">${label}</option>`).join('')}
+                    ${Object.entries(game.difficulties).map(([value, label]) => `<option value="${value}">${label}</option>`).join('')}
                   </select>
                 </label>
               </div>
@@ -175,6 +208,9 @@ class PuzzleArcade extends HTMLElement {
       <dialog class="panel" aria-labelledby="help-title">
         <h2 id="help-title">游戏玩法</h2>
         <ol>${game.help.map(step => `<li>${step}</li>`).join('')}</ol>
+        ${game.shapes ? `<ul class="shape-guide" aria-label="四格形状">
+          ${game.shapes.map(([label, pixels]) => `<li>${sprite(pixels, 'shape-pixels')}<strong>${label}</strong></li>`).join('')}
+        </ul>` : ''}
         <form method="dialog"><button class="button lavender">开始游戏</button></form>
       </dialog>
     `;
@@ -187,7 +223,7 @@ class PuzzleArcade extends HTMLElement {
         <div class="game-library">${Array.from(games, ([id, game]) => `
           <a href="#${id}" class="panel library-card">
             <div class="sprite-frame">${sprite(game.sprite, 'game-pixels')}</div>
-            <div><h2>${game.title}</h2><p>${game.description}</p></div>${icon('next')}
+            <div><h2>${game.lobbyTitle ?? game.title}</h2><p>${game.description}</p></div>${icon('next')}
           </a>
         `).join('')}</div>
       </main>
@@ -219,7 +255,8 @@ class PuzzleArcade extends HTMLElement {
 
   updateState = ({ detail }) => {
     const status = name => this.querySelector(`[data-status="${name}"]`);
-    if (!status('time')) return;
+    const game = this.activeGame;
+    if (!game || !status('time')) return;
     const { elapsed = 0, moves = 0, size, difficulty, generating, tool, canUndo, canRedo, won, filled = 0, total = 0, message = '' } = detail;
     const time = Math.max(0, Math.floor(elapsed));
     const pad = value => String(value).padStart(2, '0');
@@ -227,7 +264,7 @@ class PuzzleArcade extends HTMLElement {
     this.previousMoves = moves;
     status('time').textContent = `${pad(Math.floor(time / 60))}:${pad(time % 60)}`;
     status('moves').textContent = moves;
-    const difficultyName = difficultyNames[difficulty];
+    const difficultyName = game.difficulties[difficulty];
     status('size').textContent = size ? `${size} × ${size}${difficultyName ? ` · ${difficultyName}` : ''}` : '';
     status('puzzle').textContent = generating ? '生成中…' : won ? '解题成功' : '自由挑战';
     this.querySelector('.game-panel').toggleAttribute('data-solved', won);
@@ -241,7 +278,10 @@ class PuzzleArcade extends HTMLElement {
     this.querySelector('[data-command="redo"]').disabled = !canRedo;
     this.querySelector('[data-command="next"]').disabled = Boolean(generating);
     this.querySelector('[data-action="new"]').disabled = Boolean(generating);
-    const settings = { size: String(size ?? 10), difficulty: difficultyName ? difficulty : 'easy' };
+    const settings = {
+      size: String(size ?? game.defaultSize),
+      difficulty: difficultyName ? difficulty : Object.keys(game.difficulties)[0],
+    };
     for (const input of this.querySelectorAll('[data-setting]')) {
       const key = input.dataset.setting;
       if (!generating && (!this.activeSettings || input.value === this.activeSettings[key])) input.value = settings[key];
