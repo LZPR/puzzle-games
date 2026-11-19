@@ -6,8 +6,8 @@ nonogram-game {
   --ng-fill: #8060c0;
   --ng-error: #ae4037;
   display: grid;
-  grid-template-columns: minmax(0, var(--row-header, 3fr)) minmax(0, var(--board-track, 10fr));
-  grid-template-rows: minmax(0, var(--column-header, 3fr)) minmax(0, var(--board-track, 10fr));
+  grid-template-columns: minmax(0, var(--ng-header, 3fr)) minmax(0, var(--board-track, 10fr));
+  grid-template-rows: minmax(0, var(--ng-header, 3fr)) minmax(0, var(--board-track, 10fr));
   width: 100%;
   aspect-ratio: 1;
   max-width: 660px;
@@ -15,6 +15,7 @@ nonogram-game {
   border: 2px solid var(--ng-ink);
   background: var(--ng-background);
   color: var(--ng-ink);
+  container-type: inline-size;
   user-select: none;
   -webkit-user-select: none;
 }
@@ -72,6 +73,15 @@ nonogram-game > * {
   font: 700 clamp(9px, 1.7vw, 17px) / 1.05 var(--font-mono, ui-monospace, monospace);
   font-variant-numeric: tabular-nums;
   gap: clamp(3px, 0.65vw, 7px);
+  font-size: clamp(8px, calc(65cqw / var(--ng-slot-count)), 17px);
+  gap: clamp(2px, calc(23cqw / var(--ng-slot-count)), 7px);
+}
+
+.ng-placeholder {
+  grid-area: 1 / 1 / 3 / 3;
+  place-self: center;
+  margin: 12px;
+  text-align: center;
 }
 
 .ng-clue--column {
@@ -166,6 +176,6 @@ nonogram-game > * {
   }
 }
 
-nonogram-game[data-won] .ng-cell {
+nonogram-game:is([data-won], [aria-busy="true"]) .ng-cell {
   cursor: default;
 }

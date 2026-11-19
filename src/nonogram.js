@@ -3,6 +3,10 @@ import { cluesFor, matches, PUZZLES } from "./puzzles.js";
 const SAVE_KEY = "nonogram-progress-v1";
 const MARKS = { fill: 1, cross: 2, erase: 0 };
 const MARK_NAMES = ["空白", "已填充", "已标叉"];
+const DEFAULT_SIZE = 10;
+const DEFAULT_DIFFICULTY = "easy";
+const SIZES = [5, 10, 15];
+const DIFFICULTIES = ["easy", "medium", "hard"];
 
 function readProgress() {
   try {
@@ -17,13 +21,26 @@ function validBoard(board, size) {
     board.every(mark => mark === 0 || mark === 1 || mark === 2);
 }
 
+function validPuzzle(puzzle) {
+  return puzzle && typeof puzzle.id === "string" && puzzle.id.length > 0 &&
+    SIZES.includes(puzzle.size) && DIFFICULTIES.includes(puzzle.difficulty) &&
+    validBoard(puzzle.solution, puzzle.size) && puzzle.solution.every(mark => mark !== 2) &&
+    puzzle.solution.includes(1) && puzzle.solution.includes(0);
+}
+
 class NonogramGame extends HTMLElement {
   connectedCallback() {
-    if (!this.cells) {
+    if (!this.initialized) {
+      this.initialized = true;
       const saved = readProgress();
-      const puzzleIndex = PUZZLES.findIndex(puzzle => puzzle.id === saved?.puzzle);
       this.tool = Object.hasOwn(MARKS, saved?.tool) ? saved.tool : "fill";
-      this.load(puzzleIndex < 0 ? 0 : puzzleIndex, saved);
+      const legacyIndex = PUZZLES.findIndex(puzzle => puzzle.id === saved?.puzzle);
+      if (saved?.puzzle === saved?.definition?.id && validPuzzle(saved?.definition)) {
+        const index = Number.isSafeInteger(saved.index) && saved.index >= 0 ? saved.index : 0;
+        this.load(saved.definition, index, saved);
+      } else if (legacyIndex >= 0) {
+        this.load({ ...PUZZLES[legacyIndex], difficulty: DEFAULT_DIFFICULTY }, legacyIndex, saved);
+      }
       this.addEventListener("pointerdown", this.startStroke);
       this.addEventListener("pointermove", this.moveStroke);
       this.addEventListener("pointerup", this.finishStroke);
@@ -35,17 +52,24 @@ class NonogramGame extends HTMLElement {
     this.tick = setInterval(() => {
       if (this.startedAt) this.publish();
     }, 1000);
-    queueMicrotask(() => this.publish());
+    queueMicrotask(() => {
+      if (!this.isConnected) return;
+      if (!this.puzzle && !this.request) this.newPuzzle(DEFAULT_SIZE, DEFAULT_DIFFICULTY);
+      else this.publish();
+    });
   }
 
   disconnectedCallback() {
     clearInterval(this.tick);
+    if (this.request) this.message = "";
+    this.stopGeneration(true);
     this.finishStroke();
+    if (this.puzzle) this.publish();
   }
 
-  load(puzzleIndex, saved) {
+  load(puzzle, puzzleIndex, saved) {
     this.puzzleIndex = puzzleIndex;
-    this.puzzle = PUZZLES[puzzleIndex];
+    this.puzzle = puzzle;
     const { size, id } = this.puzzle;
     const resume = saved?.puzzle === id ? saved : null;
     this.board = validBoard(resume?.board, size) ? resume.board : Array(size ** 2).fill(0);
@@ -60,15 +84,67 @@ class NonogramGame extends HTMLElement {
     this.draw();
   }
 
+  newPuzzle(size, difficulty) {
+    if (!this.isConnected || !SIZES.includes(size) || !DIFFICULTIES.includes(difficulty)) return;
+    this.finishStroke();
+    this.stopGeneration();
+
+    const request = { size, difficulty };
+    this.request = request;
+    this.message = "正在生成谜题…";
+    this.setAttribute("aria-busy", "true");
+    if (!this.puzzle) {
+      this.innerHTML = '<p class="ng-placeholder">正在生成谜题…</p>';
+    }
+    this.publish();
+    if (this.request !== request) return;
+
+    const fail = () => {
+      if (this.request !== request) return;
+      this.stopGeneration(true);
+      this.message = "谜题生成失败，请重试。";
+      if (!this.puzzle) this.querySelector(".ng-placeholder").textContent = this.message;
+      this.publish();
+    };
+    try {
+      this.worker ??= new Worker(new URL("./generation-worker.js", import.meta.url), { type: "module" });
+      this.worker.onerror = fail;
+      this.worker.onmessageerror = fail;
+      this.worker.onmessage = ({ data }) => {
+        if (this.request !== request) return;
+        const puzzle = data?.puzzle;
+        if (!validPuzzle(puzzle) || puzzle.size !== size || puzzle.difficulty !== difficulty) {
+          fail();
+          return;
+        }
+        this.request = null;
+        this.removeAttribute("aria-busy");
+        this.load(puzzle, this.puzzle ? this.puzzleIndex + 1 : 0);
+        this.publish();
+      };
+      this.worker.postMessage({ size, difficulty, previousId: this.puzzle?.id });
+    } catch {
+      fail();
+    }
+  }
+
+  stopGeneration(discardWorker = false) {
+    if (this.request || discardWorker) {
+      this.worker?.terminate();
+      this.worker = null;
+    }
+    this.request = null;
+    this.removeAttribute("aria-busy");
+  }
+
   draw() {
     const { rows, columns } = cluesFor(this.puzzle);
     const { size } = this.puzzle;
-    const rowHeader = Math.max(3, ...rows.map(clue => clue.length));
-    const columnHeader = Math.max(3, ...columns.map(clue => clue.length));
+    const header = Math.max(3, ...rows.map(clue => clue.length), ...columns.map(clue => clue.length));
     this.style.setProperty("--size", size);
     this.style.setProperty("--board-track", `${size}fr`);
-    this.style.setProperty("--row-header", `${rowHeader}fr`);
-    this.style.setProperty("--column-header", `${columnHeader}fr`);
+    this.style.setProperty("--ng-header", `${header}fr`);
+    this.style.setProperty("--ng-slot-count", size + header);
     const clues = (groups, axis) => groups.map((group, index) => `
       <div class="ng-clue ng-clue--${axis}" role="img" aria-label="第 ${index + 1} ${axis === "row" ? "行" : "列"}提示：${group.join("、")}">
         ${group.map(n => `<span>${n}</span>`).join("")}
@@ -111,7 +187,7 @@ class NonogramGame extends HTMLElement {
 
   startStroke = event => {
     const cell = event.target.closest("[data-cell]");
-    if (!cell || this.stroke || this.won || (event.button !== 0 && event.button !== 2)) return;
+    if (!cell || this.stroke || this.request || this.won || (event.button !== 0 && event.button !== 2)) return;
     event.preventDefault();
     const index = Number(cell.dataset.cell);
     const mark = event.button === 2 ? MARKS.cross : MARKS[this.tool];
@@ -159,7 +235,7 @@ class NonogramGame extends HTMLElement {
 
   handleKey = event => {
     const cell = event.target.closest("[data-cell]");
-    if (!cell || event.altKey) return;
+    if (!cell || this.request || event.altKey) return;
     const key = event.key.toLowerCase();
     if (event.ctrlKey || event.metaKey) {
       if (key === "z" || key === "y") {
@@ -224,6 +300,7 @@ class NonogramGame extends HTMLElement {
   }
 
   command(action) {
+    if (!this.puzzle || this.request) return;
     this.finishStroke();
     if (Object.hasOwn(MARKS, action)) {
       this.tool = action;
@@ -238,10 +315,11 @@ class NonogramGame extends HTMLElement {
       this.finishMove();
       return;
     } else if (action === "reset") {
-      this.load(this.puzzleIndex);
+      this.load(this.puzzle, this.puzzleIndex);
       this.message = "棋盘已重置。";
     } else if (action === "next") {
-      this.load((this.puzzleIndex + 1) % PUZZLES.length);
+      this.newPuzzle(this.puzzle.size, this.puzzle.difficulty);
+      return;
     } else if (action === "check") {
       this.mistakes = new Set(this.board.flatMap((mark, index) => {
         const expected = this.puzzle.solution[index];
@@ -255,30 +333,31 @@ class NonogramGame extends HTMLElement {
   }
 
   seconds() {
-    return this.elapsed + (this.startedAt ? Math.floor((Date.now() - this.startedAt) / 1000) : 0);
+    return (this.elapsed ?? 0) + (this.startedAt ? Math.floor((Date.now() - this.startedAt) / 1000) : 0);
   }
 
   publish() {
     const elapsed = this.seconds();
     const detail = {
-      size: this.puzzle.size,
+      size: this.request?.size ?? this.puzzle?.size ?? DEFAULT_SIZE,
+      difficulty: this.request?.difficulty ?? this.puzzle?.difficulty ?? DEFAULT_DIFFICULTY,
+      generating: Boolean(this.request),
       elapsed,
-      moves: this.moves,
+      moves: this.moves ?? 0,
       tool: this.tool,
-      canUndo: Boolean(this.past.length),
-      canRedo: Boolean(this.future.length),
-      won: this.won,
-      filled: this.board.filter(mark => mark === 1).length,
-      total: this.puzzle.solution.filter(Boolean).length,
-      puzzleIndex: this.puzzleIndex,
-      puzzleCount: PUZZLES.length,
+      canUndo: Boolean(this.past?.length),
+      canRedo: Boolean(this.future?.length),
+      won: Boolean(this.won),
+      filled: this.board?.filter(mark => mark === 1).length ?? 0,
+      total: this.puzzle?.solution.filter(Boolean).length ?? 0,
+      puzzleIndex: this.puzzleIndex ?? 0,
       message: this.message,
     };
-    if (!this.stroke) {
+    if (this.puzzle && !this.stroke) {
       try {
         localStorage.setItem(SAVE_KEY, JSON.stringify({
           puzzle: this.puzzle.id, board: this.board, past: this.past, future: this.future,
-          moves: this.moves, elapsed, tool: this.tool,
+          definition: this.puzzle, index: this.puzzleIndex, moves: this.moves, elapsed, tool: this.tool,
         }));
       } catch {
         // Keep playing if persistent storage is unavailable.

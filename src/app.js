@@ -24,6 +24,8 @@ const games = new Map([
   }],
 ]);
 
+const difficultyNames = { easy: '简单', medium: '中等', hard: '困难' };
+
 const icons = {
   grid: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>',
   sound: '<path d="M3 9h4l5-4v14l-5-4H3z"/><path d="M16 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>',
@@ -40,6 +42,7 @@ const icons = {
   check: '<path d="m5 12 4 4L19 6"/>',
   reset: '<path d="M4 10a8 8 0 1 1 1 7M4 4v6h6"/>',
   next: '<path d="M4 12h15m-6-6 6 6-6 6"/>',
+  add: '<path d="M12 5v14M5 12h14"/>',
 };
 
 const icon = (name, size = 20) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name]}</svg>`;
@@ -77,6 +80,7 @@ class PuzzleArcade extends HTMLElement {
 
   render(route) {
     const game = games.get(route);
+    this.activeSettings = null;
     document.title = game ? `${game.title} · 方块街机` : '游戏大厅 · 方块街机';
     this.innerHTML = `
       <header class="site-header">
@@ -108,7 +112,7 @@ class PuzzleArcade extends HTMLElement {
           <section class="panel game-panel" aria-label="数织棋盘">
             <div class="game-panel-header">
               <div class="panel-title"><span class="panel-lights" aria-hidden="true"><i></i><i></i><i></i></span><h2>数织棋盘</h2></div>
-              <span class="puzzle-label" data-status="puzzle">关卡 01</span>
+              <span class="puzzle-label" data-status="puzzle">自由挑战</span>
             </div>
             <div class="board-body"><${game.element}></${game.element}></div>
             <div class="board-footer">
@@ -142,10 +146,28 @@ class PuzzleArcade extends HTMLElement {
                 ${button('check', '检查答案', 'mint check-button')}
                 <div class="history-row">
                   ${button('reset', '重置')}
-                  ${button('next', '下一关', 'next-button')}
+                  ${button('next', '换一题', 'next-button')}
                 </div>
               </div>
               <p class="board-message" data-status="message" role="status"></p>
+            </section>
+            <section class="panel sidebar-panel settings-panel" aria-labelledby="settings-title">
+              <div class="aside-heading">${icon('grid', 19)}<h2 id="settings-title">新局设置</h2></div>
+              <div class="settings-row">
+                <label>棋盘尺寸
+                  <select data-setting="size">
+                    <option value="5">5 × 5</option>
+                    <option value="10" selected>10 × 10</option>
+                    <option value="15">15 × 15</option>
+                  </select>
+                </label>
+                <label>难度
+                  <select data-setting="difficulty">
+                    ${Object.entries(difficultyNames).map(([value, label]) => `<option value="${value}">${label}</option>`).join('')}
+                  </select>
+                </label>
+              </div>
+              <button type="button" class="button yellow new-game-button" data-action="new">${icon('add', 18)}<span>新开一局</span></button>
             </section>
           </aside>
         </div>
@@ -183,6 +205,12 @@ class PuzzleArcade extends HTMLElement {
       this.playSound();
     }
     if (action === 'help') this.querySelector('dialog').showModal();
+    if (action === 'new') {
+      const size = Number(this.querySelector('[data-setting="size"]').value);
+      const difficulty = this.querySelector('[data-setting="difficulty"]').value;
+      this.board.newPuzzle(size, difficulty);
+      this.playSound(520);
+    }
     if (command) {
       this.board?.command(command);
       this.playSound(command === 'check' ? 600 : 460);
@@ -192,24 +220,34 @@ class PuzzleArcade extends HTMLElement {
   updateState = ({ detail }) => {
     const status = name => this.querySelector(`[data-status="${name}"]`);
     if (!status('time')) return;
-    const { elapsed = 0, moves = 0, size, tool, canUndo, canRedo, won, puzzleIndex = 0, puzzleCount, filled = 0, total = 0, message = '' } = detail;
+    const { elapsed = 0, moves = 0, size, difficulty, generating, tool, canUndo, canRedo, won, filled = 0, total = 0, message = '' } = detail;
     const time = Math.max(0, Math.floor(elapsed));
     const pad = value => String(value).padStart(2, '0');
     if (this.previousMoves !== undefined && this.previousMoves !== moves && moves > 0) this.playSound(420);
     this.previousMoves = moves;
     status('time').textContent = `${pad(Math.floor(time / 60))}:${pad(time % 60)}`;
     status('moves').textContent = moves;
-    status('size').textContent = size ? `${size} × ${size}` : '';
-    status('puzzle').textContent = `关卡 ${pad(puzzleIndex + 1)}`;
-    status('puzzle').setAttribute('aria-label', `第 ${puzzleIndex + 1} 关，共 ${puzzleCount} 关`);
+    const difficultyName = difficultyNames[difficulty];
+    status('size').textContent = size ? `${size} × ${size}${difficultyName ? ` · ${difficultyName}` : ''}` : '';
+    status('puzzle').textContent = generating ? '生成中…' : won ? '解题成功' : '自由挑战';
     this.querySelector('.game-panel').toggleAttribute('data-solved', won);
     status('progress-label').textContent = `${filled} / ${total}`;
     status('progress').max = total || 1;
     status('progress').value = filled;
-    if (status('message').textContent !== message) status('message').textContent = message;
+    const announcement = generating ? '正在生成新棋盘…' : message;
+    if (status('message').textContent !== announcement) status('message').textContent = announcement;
     for (const button of this.querySelectorAll('.tool-button')) button.setAttribute('aria-pressed', button.dataset.command === tool);
     this.querySelector('[data-command="undo"]').disabled = !canUndo;
     this.querySelector('[data-command="redo"]').disabled = !canRedo;
+    this.querySelector('[data-command="next"]').disabled = Boolean(generating);
+    this.querySelector('[data-action="new"]').disabled = Boolean(generating);
+    const settings = { size: String(size ?? 10), difficulty: difficultyName ? difficulty : 'easy' };
+    for (const input of this.querySelectorAll('[data-setting]')) {
+      const key = input.dataset.setting;
+      if (!generating && (!this.activeSettings || input.value === this.activeSettings[key])) input.value = settings[key];
+      input.disabled = Boolean(generating);
+    }
+    if (!generating) this.activeSettings = settings;
   };
 
   playSound(frequency = 480) {
