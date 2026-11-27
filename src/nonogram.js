@@ -145,6 +145,7 @@ class NonogramGame extends GridGame {
     this.innerHTML = `
       <div class="ng-corner" aria-hidden="true">
         <span class="ng-motif">${"010111010".split("").map(pixel => `<i class="ng-pixel ng-pixel--${pixel}"></i>`).join("")}</span>
+        <span class="ng-stroke-count" hidden></span>
       </div>
       <div class="ng-columns">${clues(columns, "column")}</div>
       <div class="ng-rows">${clues(rows, "row")}</div>
@@ -154,19 +155,19 @@ class NonogramGame extends GridGame {
           return `<div class="ng-cell" role="gridcell" tabindex="${index ? -1 : 0}" data-cell="${index}"></div>`;
         }).join("")}</div>`).join("")}
       </div>`;
-    this.cells = [...this.querySelectorAll("[data-cell]")];
-    this.focusIndex = 0;
+    this.bindGrid();
     this.paint();
   }
 
   paint() {
     const { size } = this.puzzle;
+    const marks = this.displayedBoard();
     this.cells.forEach((cell, index) => {
       const row = Math.floor(index / size);
       const column = index % size;
-      cell.dataset.mark = this.board[index];
+      cell.dataset.mark = marks[index];
       cell.classList.toggle("ng-error", this.mistakes.has(index));
-      cell.setAttribute("aria-label", `第 ${row + 1} 行，第 ${column + 1} 列，${MARK_NAMES[this.board[index]]}`);
+      cell.setAttribute("aria-label", `第 ${row + 1} 行，第 ${column + 1} 列，${MARK_NAMES[marks[index]]}`);
     });
     this.toggleAttribute("data-won", this.won);
   }

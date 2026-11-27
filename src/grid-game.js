@@ -12,6 +12,13 @@ export class GridGame extends HTMLElement {
     this.addEventListener("keydown", this.handleKey);
   }
 
+  bindGrid() {
+    this.grid = this.querySelector('[role="grid"]');
+    this.cells = [...this.grid.querySelectorAll("[data-cell]")];
+    this.strokeCount = this.querySelector(".ng-stroke-count");
+    this.focusIndex = 0;
+  }
+
   focusCell(index) {
     this.cells[this.focusIndex].tabIndex = -1;
     this.focusIndex = index;
@@ -27,45 +34,69 @@ export class GridGame extends HTMLElement {
     const mark = event.button === 2 ? MARKS.cross : MARKS[this.tool];
     this.stroke = {
       pointer: event.pointerId,
-      before: [...this.board],
       mark: this.board[index] === mark ? 0 : mark,
-      previous: index,
+      start: index,
+      x: event.clientX,
+      y: event.clientY,
+      axis: null,
+      end: index,
+      indices: [index],
     };
     this.focusCell(index);
     this.setPointerCapture(event.pointerId);
-    this.applyMarks([index], this.stroke.mark);
+    this.paint();
   };
 
   moveStroke = event => {
-    if (this.stroke?.pointer !== event.pointerId) return;
-    const cell = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-cell]");
-    if (!cell || !this.contains(cell)) {
-      this.stroke.previous = null;
-      return;
-    }
-    const index = Number(cell.dataset.cell);
-    const previous = this.stroke.previous ?? index;
-    this.stroke.previous = index;
+    const stroke = this.stroke;
+    if (stroke?.pointer !== event.pointerId) return;
     const size = this.puzzle.size;
-    const row = Math.floor(previous / size);
-    const column = previous % size;
-    const rowDelta = Math.floor(index / size) - row;
-    const columnDelta = index % size - column;
-    const steps = Math.max(1, Math.abs(rowDelta), Math.abs(columnDelta));
-    const indices = Array.from({ length: steps }, (_, step) => {
-      const ratio = (step + 1) / steps;
-      return Math.round(row + rowDelta * ratio) * size + Math.round(column + columnDelta * ratio);
-    });
-    this.applyMarks(indices, this.stroke.mark);
+    const rect = this.grid.getBoundingClientRect();
+    const slot = (coordinate, origin, length) =>
+      Math.min(size - 1, Math.max(0, Math.floor((coordinate - origin) * size / length)));
+    const row = slot(event.clientY, rect.top, rect.height);
+    const column = slot(event.clientX, rect.left, rect.width);
+    const startRow = Math.floor(stroke.start / size);
+    const startColumn = stroke.start % size;
+    const axis = stroke.axis ?? (Math.abs(event.clientX - stroke.x) >= Math.abs(event.clientY - stroke.y) ? "row" : "column");
+    const end = axis === "row" ? startRow * size + column : row * size + startColumn;
+    if (end === stroke.end) return;
+
+    stroke.axis = axis;
+    stroke.end = end;
+    const stride = axis === "row" ? 1 : size;
+    const first = Math.min(stroke.start, end);
+    const count = (Math.max(stroke.start, end) - first) / stride + 1;
+    stroke.indices = Array.from({ length: count }, (_, offset) => first + offset * stride);
+    this.strokeCount.hidden = count < 2;
+    this.strokeCount.textContent = count > 1 ? `${count} 格` : "";
+    this.paint();
   };
 
   finishStroke = event => {
     if (!this.stroke || (event && this.stroke.pointer !== event.pointerId)) return;
-    const { before, pointer } = this.stroke;
+    const released = event?.type === "pointerup";
+    if (released) this.moveStroke(event);
+    const { indices, mark, pointer } = this.stroke;
     this.stroke = null;
+    this.strokeCount.hidden = true;
+    this.strokeCount.textContent = "";
     if (this.hasPointerCapture(pointer)) this.releasePointerCapture(pointer);
+    if (!released) {
+      this.paint();
+      return;
+    }
+    const before = [...this.board];
+    this.applyMarks(indices, mark);
     this.commit(before);
   };
+
+  displayedBoard() {
+    if (!this.stroke) return this.board;
+    const preview = [...this.board];
+    for (const index of this.stroke.indices) preview[index] = this.stroke.mark;
+    return preview;
+  }
 
   handleKey = event => {
     const cell = event.target.closest("[data-cell]");
@@ -94,7 +125,7 @@ export class GridGame extends HTMLElement {
       this.focusCell(targets[key]);
     } else if ([" ", "enter", "x", "delete", "backspace"].includes(key)) {
       event.preventDefault();
-      if (this.won) return;
+      if (this.won || this.stroke) return;
       const mark = key === "x" ? MARKS.cross :
         key === "delete" || key === "backspace" ? MARKS.erase : MARKS[this.tool];
       const before = [...this.board];

@@ -39,11 +39,43 @@ nonogram-game > * {
 }
 
 .ng-motif {
+  grid-area: 1 / 1;
   display: grid;
   grid-template-columns: repeat(3, clamp(4px, 1vw, 8px));
   grid-auto-rows: clamp(4px, 1vw, 8px);
   gap: 2px;
   transform: rotate(-6deg);
+}
+
+.ng-corner:has(.ng-stroke-count:not([hidden])) .ng-motif {
+  visibility: hidden;
+}
+
+.ng-stroke-count {
+  grid-area: 1 / 1;
+  border: 1px solid var(--ng-ink, var(--lits-ink));
+  border-radius: 4px;
+  background: #ded1ff;
+  padding: 3px clamp(2px, 1cqw, 7px);
+  font-size: clamp(9px, 4cqw, 15px);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+lits-game {
+  position: relative;
+}
+
+lits-game > .ng-stroke-count {
+  position: absolute;
+  inset-block-start: -3px;
+  inset-inline-end: -3px;
+  transform: translateY(-100%);
+  padding: 2px 6px;
+  font-size: 12px;
 }
 
 .ng-pixel--1 {

@@ -179,16 +179,17 @@ class LitsGame extends GridGame {
                 role="gridcell" tabindex="${index ? -1 : 0}" data-cell="${index}"></div>`;
             }).join("")}
           </div>`).join("")}
-      </div>`;
-    this.cells = [...this.querySelectorAll("[data-cell]")];
-    this.focusIndex = 0;
+      </div>
+      <span class="ng-stroke-count" aria-hidden="true" hidden></span>`;
+    this.bindGrid();
     this.paint();
   }
 
   paint() {
     const { size, regions } = this.puzzle;
+    const marks = this.displayedBoard();
     const filledByRegion = new Map();
-    for (const [index, mark] of this.board.entries()) {
+    for (const [index, mark] of marks.entries()) {
       if (mark !== 1) continue;
       const region = regions[index];
       if (!filledByRegion.has(region)) filledByRegion.set(region, []);
@@ -200,7 +201,7 @@ class LitsGame extends GridGame {
       const row = Math.floor(index / size) + 1;
       const column = index % size + 1;
       const region = this.regionNumbers.get(regions[index]);
-      const mark = this.board[index];
+      const mark = marks[index];
       const shape = mark === 1 ? shapes.get(regions[index]) : null;
       cell.dataset.mark = mark;
       if (shape) cell.dataset.shape = shape;
