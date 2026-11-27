@@ -1,6 +1,9 @@
 export const MARKS = { fill: 1, cross: 2, erase: 0 };
 export const MARK_NAMES = ["空白", "已填充", "已标叉"];
 
+const TOUCH_HOLD_MS = 400;
+const TOUCH_SLOP_PX = 8;
+
 export class GridGame extends HTMLElement {
   listenForGridInput() {
     this.addEventListener("pointerdown", this.startStroke);
@@ -31,25 +34,45 @@ export class GridGame extends HTMLElement {
     if (!cell || this.stroke || this.request || this.won || (event.button !== 0 && event.button !== 2)) return;
     event.preventDefault();
     const index = Number(cell.dataset.cell);
-    const mark = event.button === 2 ? MARKS.cross : MARKS[this.tool];
-    this.stroke = {
+    const touch = event.pointerType === "touch";
+    const mark = touch ? MARKS.fill : event.button === 2 ? MARKS.cross : MARKS[this.tool];
+    const stroke = this.stroke = {
       pointer: event.pointerId,
-      mark: this.board[index] === mark ? 0 : mark,
+      mark: this.board[index] === mark ? MARKS.erase : mark,
       start: index,
       x: event.clientX,
       y: event.clientY,
       axis: null,
       end: index,
       indices: [index],
+      touch,
+      moved: false,
+      hold: null,
     };
     this.focusCell(index);
     this.setPointerCapture(event.pointerId);
+    if (touch) {
+      stroke.hold = setTimeout(() => {
+        if (this.stroke !== stroke || stroke.moved) return;
+        stroke.hold = null;
+        stroke.mark = this.board[index] === MARKS.cross ? MARKS.erase : MARKS.cross;
+        this.paint();
+      }, TOUCH_HOLD_MS);
+    }
     this.paint();
   };
 
   moveStroke = event => {
     const stroke = this.stroke;
     if (stroke?.pointer !== event.pointerId) return;
+    const dx = Math.abs(event.clientX - stroke.x);
+    const dy = Math.abs(event.clientY - stroke.y);
+    if (stroke.touch && !stroke.moved) {
+      if (Math.hypot(dx, dy) <= TOUCH_SLOP_PX) return;
+      stroke.moved = true;
+      clearTimeout(stroke.hold);
+      stroke.hold = null;
+    }
     const size = this.puzzle.size;
     const rect = this.grid.getBoundingClientRect();
     const slot = (coordinate, origin, length) =>
@@ -58,7 +81,7 @@ export class GridGame extends HTMLElement {
     const column = slot(event.clientX, rect.left, rect.width);
     const startRow = Math.floor(stroke.start / size);
     const startColumn = stroke.start % size;
-    const axis = stroke.axis ?? (Math.abs(event.clientX - stroke.x) >= Math.abs(event.clientY - stroke.y) ? "row" : "column");
+    const axis = stroke.axis ?? (dx >= dy ? "row" : "column");
     const end = axis === "row" ? startRow * size + column : row * size + startColumn;
     if (end === stroke.end) return;
 
@@ -77,7 +100,8 @@ export class GridGame extends HTMLElement {
     if (!this.stroke || (event && this.stroke.pointer !== event.pointerId)) return;
     const released = event?.type === "pointerup";
     if (released) this.moveStroke(event);
-    const { indices, mark, pointer } = this.stroke;
+    const { indices, mark, pointer, hold } = this.stroke;
+    clearTimeout(hold);
     this.stroke = null;
     this.strokeCount.hidden = true;
     this.strokeCount.textContent = "";

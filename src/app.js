@@ -153,6 +153,7 @@ class PuzzleArcade extends HTMLElement {
               <span class="puzzle-label" data-status="puzzle">自由挑战</span>
             </div>
             <div class="board-body"><${game.element}></${game.element}></div>
+            <p class="touch-hint"><strong>轻点填充 · 长按标叉</strong><span>直接拖动填充，长按后拖动标叉。起点已有相同标记时，改为擦除。</span></p>
             <div class="board-footer">
               <span><i class="legend-square" aria-hidden="true"></i>填充</span>
               <span><i class="legend-cross" aria-hidden="true">×</i>标叉</span>
@@ -171,7 +172,8 @@ class PuzzleArcade extends HTMLElement {
             </section>
             <section class="panel sidebar-panel control-panel">
               <div class="aside-heading">${icon('gamepad', 21)}<h2>操作面板</h2></div>
-              <div class="tool-row" role="group" aria-label="绘制工具">
+              <p class="tool-input-hint">以下绘制工具适用于鼠标和键盘。</p>
+              <div class="tool-row" role="group" aria-label="鼠标和键盘绘制工具">
                 ${toolButton('fill', '填充', 'lavender')}
                 ${toolButton('cross', '标叉', 'peach')}
                 ${toolButton('erase', '擦除', 'yellow')}
@@ -210,7 +212,10 @@ class PuzzleArcade extends HTMLElement {
       </main>
       <dialog class="panel" aria-labelledby="help-title">
         <h2 id="help-title">游戏玩法</h2>
-        <ol>${game.help.map(step => `<li>${step}</li>`).join('')}</ol>
+        <ol>
+          ${game.help.map(step => `<li>${step}</li>`).join('')}
+          <li>触屏轻点或直接拖动可填充，长按再松手或拖动可标叉。起点已有相同标记时，这次操作会擦除当前格或整条线段。操作面板里的绘制工具适用于鼠标和键盘。</li>
+        </ol>
         ${game.shapes ? `<p class="shape-help">${game.shapeHelp}</p>
         <ul class="shape-guide" aria-label="四格形状">
           ${game.shapes.map(([label, pixels]) => `<li data-shape="${label}">${sprite(pixels, 'shape-pixels')}<strong>${label}</strong></li>`).join('')}

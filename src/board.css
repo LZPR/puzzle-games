@@ -129,6 +129,7 @@ lits-game > .ng-stroke-count {
   display: grid;
   grid-template-rows: repeat(var(--size), minmax(0, 1fr));
   touch-action: none;
+  -webkit-touch-callout: none;
 }
 
 .ng-cell-row {
